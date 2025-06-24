@@ -17,6 +17,7 @@ function App() {
   const [messages, setMessages] = useState<MessageProps[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const lastStatusRef = useRef<{ [k in Step]?: string }>({});
 
   // Helper to add a message
   const addMessage = useCallback((content: string, sender: 'user' | 'assistant') => {
@@ -40,15 +41,16 @@ function App() {
         content: `${STEP_LABELS[step]}...`,
         sender: 'assistant',
         timestamp: new Date(),
+        faded: true,
       },
     ]);
   }, []);
 
-  // Helper to replace a loading message with the result
-  const replaceStepMessage = useCallback((step: Step, result: string) => {
+  // Helper to replace a loading message with the result (faded for plan/gather, normal for expand)
+  const replaceStepMessage = useCallback((step: Step, result: string, faded: boolean) => {
     setMessages(prev => {
       // Remove the loading message for this step
-      const filtered = prev.filter(m => m.id !== `loading-${step}`);
+      const filtered = prev.filter(m => m.id !== `loading-${step}` && m.id !== `result-${step}`);
       return [
         ...filtered,
         {
@@ -56,6 +58,25 @@ function App() {
           content: result,
           sender: 'assistant',
           timestamp: new Date(),
+          faded,
+        },
+      ];
+    });
+  }, []);
+
+  // Helper to replace all assistant messages with expand result
+  const replaceAllWithExpand = useCallback((expandResult: string) => {
+    setMessages(prev => {
+      // Keep only user messages
+      const userMessages = prev.filter(m => m.sender === 'user');
+      return [
+        ...userMessages,
+        {
+          id: `result-expand`,
+          content: expandResult,
+          sender: 'assistant',
+          timestamp: new Date(),
+          faded: false,
         },
       ];
     });
@@ -63,48 +84,47 @@ function App() {
 
   // Poll job status and update messages
   const pollJobStatus = useCallback((jobId: string) => {
-    let lastStatus: { [k in Step]?: string } = {};
+    lastStatusRef.current = {};
     setStepLoading('plan');
     setStepLoading('gather');
     setStepLoading('expand');
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await axios.get(`/status/${jobId}`);
+        const res = await axios.get(`http://localhost:5000/status/${jobId}`);
         const { plan, gather, expand } = res.data;
-        // For each step, if status is done and not already shown, show result
-        if (plan?.status === 'done' && lastStatus.plan !== 'done') {
-          replaceStepMessage('plan', plan.result || 'Plan complete.');
-          lastStatus.plan = 'done';
-        }
-        if (gather?.status === 'done' && lastStatus.gather !== 'done') {
-          replaceStepMessage('gather', gather.result || 'Gathering complete.');
-          lastStatus.gather = 'done';
-        }
-        if (expand?.status === 'done' && lastStatus.expand !== 'done') {
-          replaceStepMessage('expand', expand.result || 'Expansion complete.');
-          lastStatus.expand = 'done';
-        }
-        // Stop polling if all done
-        if (
-          plan?.status === 'done' &&
-          gather?.status === 'done' &&
-          expand?.status === 'done'
-        ) {
+        // If expand is available, show only expand and stop polling
+        if (expand && expand.data && expand.data.results && expand.data.results.expand) {
+          const expandResult = typeof expand.data.results.expand === 'string'
+            ? expand.data.results.expand
+            : (expand.data.results.expand.final_response || 'Expansion complete.');
+          replaceAllWithExpand(expandResult);
           setIsTyping(false);
           if (pollingRef.current) clearInterval(pollingRef.current);
+          return;
+        }
+        // For each step, if result is available and not already shown, show result
+        if (plan && plan.data && plan.data.results && plan.data.results.plan && lastStatusRef.current.plan !== 'done') {
+          replaceStepMessage('plan', plan.data.results.plan.final_response || 'Plan complete.', true);
+          lastStatusRef.current.plan = 'done';
+        }
+        if (gather && gather.data && gather.data.results && gather.data.results.gather && lastStatusRef.current.gather !== 'done') {
+          replaceStepMessage('gather', typeof gather.data.results.gather === 'string'
+            ? gather.data.results.gather
+            : (gather.data.results.gather.final_response || 'Gathering complete.'), true);
+          lastStatusRef.current.gather = 'done';
         }
       } catch (err) {
         // Optionally handle error
       }
-    }, 2000);
-  }, [replaceStepMessage, setStepLoading]);
+    }, 5000); // 5 seconds
+  }, [replaceStepMessage, setStepLoading, replaceAllWithExpand]);
 
   // Handle user sending a message
   const handleSendMessage = useCallback(async (content: string) => {
     addMessage(content, 'user');
     setIsTyping(true);
     try {
-      const res = await axios.post('/research', { topic: content });
+      const res = await axios.post('http://localhost:5000/research', { topic: content });
       const { jobId } = res.data;
       pollJobStatus(jobId);
     } catch (err) {

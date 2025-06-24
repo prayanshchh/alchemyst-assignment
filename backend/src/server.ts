@@ -5,6 +5,13 @@ import { ObjectId, Collection } from 'mongodb';
 import mqPublisher from './queue';
 import { getDb } from './mongodb';
 import { startWorker } from './worker';
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+//@ts-ignore
+import Agendash from 'agendash';
+import agenda from './agenda';
+
 dotenv.config();
 
 const app = express();
@@ -14,6 +21,15 @@ app.use(express.json());
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
 let jobs: Collection;
+
+const sdk = new NodeSDK({
+  traceExporter: new OTLPTraceExporter({
+    url: 'http://localhost:4318/v1/traces', // default OTLP endpoint
+  }),
+  instrumentations: [getNodeAutoInstrumentations()]
+});
+
+sdk.start();
 
 async function startServer() {
   try {
@@ -47,15 +63,17 @@ app.post('/research', async (req: Request, res: Response) => {
   }
 });
 
+app.use('/dash', Agendash(agenda));
+
 // GET /status/:jobId
 app.get('/status/:jobId', async (req: Request, res: Response) => {
   const { jobId } = req.params;
   try {
     const db = await getDb();
     const [plan, gather, expand] = await Promise.all([
-      db.collection('plan').findOne({ jobId }),
-      db.collection('gather').findOne({ jobId }),
-      db.collection('expand').findOne({ jobId })
+      db.collection('agendaJobs').findOne({ name: 'plan', 'data.jobId': jobId }),
+      db.collection('agendaJobs').findOne({ name: 'gather', 'data.jobId': jobId }),
+      db.collection('agendaJobs').findOne({ name: 'expand', 'data.jobId': jobId })
     ]);
     res.json({
       jobId,
@@ -66,4 +84,6 @@ app.get('/status/:jobId', async (req: Request, res: Response) => {
   } catch (err) {
     res.status(400).json({ error: 'Invalid jobId' });
   }
-}); 
+});
+
+export default app;
