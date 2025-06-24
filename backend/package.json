@@ -1,0 +1,21 @@
+{
+  "name": "deep-research-backend",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/server.ts"
+  },
+  "dependencies": {
+    "agenda": "^5.0.0",
+    "amqplib": "^0.10.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "mongodb": "^5.7.0"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.7",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.0"
+  }
+}
