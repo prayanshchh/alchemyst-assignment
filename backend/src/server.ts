@@ -1,16 +1,13 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { ObjectId, Collection } from 'mongodb';
+import { Collection } from 'mongodb';
 import mqPublisher from './queue';
 import { getDb } from './mongodb';
 import { startWorker } from './worker';
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import agenda from './agenda';
 //@ts-ignore
 import Agendash from 'agendash';
-import agenda from './agenda';
 
 dotenv.config();
 
@@ -21,15 +18,6 @@ app.use(express.json());
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
 let jobs: Collection;
-
-const sdk = new NodeSDK({
-  traceExporter: new OTLPTraceExporter({
-    url: 'http://localhost:4318/v1/traces', // default OTLP endpoint
-  }),
-  instrumentations: [getNodeAutoInstrumentations()]
-});
-
-sdk.start();
 
 async function startServer() {
   try {
