@@ -50,4 +50,29 @@ export function extractFinalResponseFromSSEString(sseString: string): string {
     }
   }
   return '';
+}
+
+export async function parseProxyChatCompletionResponse(response: Response): Promise<string> {
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Proxy API error:', response.status, response.statusText, errorText);
+    return '';
+  }
+  try {
+    const data = await response.json();
+    console.log("I am data: ", data)
+    if (
+      data &&
+      Array.isArray(data.choices) &&
+      data.choices.length > 0 &&
+      data.choices[0].message &&
+      typeof data.choices[0].message.content === 'string'
+    ) {
+      return data.choices[0].message.content;
+    }
+    return '';
+  } catch (e) {
+    console.error('Failed to parse proxy API response:', e);
+    return '';
+  }
 } 

@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import { Collection } from 'mongodb';
 import mqPublisher from './queue';
 import { getDb } from './mongodb';
-import { startWorker } from './worker';
 import agenda from './agenda';
 //@ts-ignore
 import Agendash from 'agendash';
@@ -31,7 +30,6 @@ async function startServer() {
 }
 
 startServer();
-startWorker();
 
 // POST /research
 app.post('/research', async (req: Request, res: Response) => {

@@ -65,16 +65,4 @@ class RabbitMQWorker {
 }
 
 const worker = new RabbitMQWorker();
-
-// Graceful shutdown for Agenda
-function gracefulShutdown() {
-  console.log('Graceful shutdown: Stopping Agenda...');
-  agenda.stop().then(() => {
-    console.log('Agenda stopped. Exiting process.');
-    process.exit(0);
-  });
-}
-
-export function startWorker() {
-  worker.start();
-} 
+worker.start();

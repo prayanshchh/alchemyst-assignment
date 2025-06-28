@@ -1,7 +1,7 @@
 import { Agenda, Job } from 'agenda';
 import * as dotenv from 'dotenv';
 dotenv.config();
-import { parseSSEStream, extractFinalResponseFromSSEString } from '../utils/parseSSEStream';
+import { parseProxyChatCompletionResponse } from '../utils/parseSSEStream';
 
 interface ExpandJobData {
   jobId: string;
@@ -15,17 +15,21 @@ export default function expandStep(agenda: Agenda) {
   agenda.define('expand', async (job: Job<ExpandJobData>, done) => {
     const { jobId, topic } = job.attrs.data;
     console.log('[expand] starting →', jobId);
-
+    
     const gatherResult = (job.attrs.data as any).results?.gather;
-    const contextString = typeof gatherResult === 'string' ? gatherResult : '';
+    console.log("I am gather: ", gatherResult)
+    const planResult = (job.attrs.data as any).results?.plan;
+    const planString = typeof planResult === 'string' ? planResult : '';
 
-    const endpoint = `${ALCHEMYST_BASE}/api/v1/chat/generate/stream`;
+    const endpoint = `${ALCHEMYST_BASE}/api/v1/proxy/default/chat/completions`;
     const body = {
-      chat_history: [
-        { content: `Using the following context, write a detailed, properly-formatted research report on: ${topic}\n\nContext:\n${contextString}`, role: 'user' }
-      ],
-      persona: 'maya',
-      scope  : 'internal'
+      model: 'alchemyst-ai/alchemyst-c1',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: `Write a research plan for: ${topic}` },
+        { role: 'assistant', content: planString },
+        { role: 'user', content: `Using the following plan, write a detailed, properly-formatted research report` },
+      ]
     };
 
     try {
@@ -37,9 +41,8 @@ export default function expandStep(agenda: Agenda) {
         },
         body: JSON.stringify(body)
       });
-      const result = await parseSSEStream(response);
-      const extracted = extractFinalResponseFromSSEString(result);
-      (job.attrs.data as any).results = { ...(job.attrs.data as any).results, expand: extracted !== '' ? extracted : result };
+      const extracted = await parseProxyChatCompletionResponse(response);
+      (job.attrs.data as any).results = { ...(job.attrs.data as any).results, expand: extracted };
       await job.save();
       console.log('[expand] finished →', jobId);
       done();

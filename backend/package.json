@@ -3,7 +3,9 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node src/server.ts"
+    "dev": "ts-node src/server.ts",
+    "start:server": "ts-node src/server.ts",
+    "start:worker": "ts-node src/worker.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

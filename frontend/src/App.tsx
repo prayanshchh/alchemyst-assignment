@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { FaRobot } from 'react-icons/fa';
 import Header from './components/Header';
 import ConversationPane from './components/ConversationPane';
 import InputBar from './components/InputBar';
+import TypingIndicator from './components/TypingIndicator';
 import type { MessageProps } from './components/Message';
 
 const STEP_LABELS = {
@@ -141,10 +143,19 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col">
-      <Header />
-      <ConversationPane messages={messages} isTyping={isTyping} />
-      <InputBar onSendMessage={handleSendMessage} disabled={isTyping} />
+    <div className="min-h-screen w-full bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-800 flex items-center justify-center">
+      <div className="w-full max-w-6xl h-[80vh] flex flex-col bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+        <Header />
+        <div className="flex-1 min-h-0 flex flex-col">
+          <ConversationPane messages={messages} isTyping={isTyping} />
+        </div>
+        <div className="border-t border-white/10 bg-white/5 px-4 py-3">
+          <InputBar onSendMessage={handleSendMessage} disabled={isTyping} />
+        </div>
+      </div>
+      <div className="absolute bottom-2 left-0 right-0 text-center text-slate-400 text-xs">
+        <span>Powered by Alchemyst AI</span>
+      </div>
     </div>
   );
 }
