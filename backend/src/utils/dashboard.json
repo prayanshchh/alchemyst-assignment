@@ -1,0 +1,125 @@
+{
+    "title": "Agenda Job Observatory",
+    "uid": "agenda-jobs",
+    "schemaVersion": 38,
+    "version": 6,
+    "time": { "from": "now-6h", "to": "now" },
+  
+    "templating": {
+      "list": [
+        {
+          "type": "query",
+          "name": "job",
+          "label": "Agenda job",
+          "datasource": "prometheus",
+          "definition": "label_values(agenda_job_success_total{exported_job!~\"agenda\\\\..*\"}, exported_job)",
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 2
+        }
+      ]
+    },
+  
+    "panels": [
+      {
+        "type": "stat",
+        "title": "Total successes",
+        "datasource": "prometheus",
+        "targets": [
+          {
+            "expr": "sum by(exported_job)(agenda_job_success_total{exported_job!~\"agenda\\\\..*\", exported_job=~\"$job\"})",
+            "instant": true,
+            "legendFormat": "{{exported_job}}"
+          }
+        ],
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+      },
+  
+      {
+        "type": "stat",
+        "title": "Total failures",
+        "datasource": "prometheus",
+        "targets": [
+          {
+            "expr": "sum by(exported_job)(agenda_job_failure_total{exported_job!~\"agenda\\\\..*\", exported_job=~\"$job\"})",
+            "instant": true,
+            "legendFormat": "{{exported_job}}"
+          }
+        ],
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 }
+      },
+  
+      {
+        "type": "timeseries",
+        "title": "Throughput (jobs/min)",
+        "datasource": "prometheus",
+        "targets": [
+          {
+            "expr": "rate(agenda_job_success_total{exported_job!~\"agenda\\\\..*\", exported_job=~\"$job\"}[1m])",
+            "legendFormat": "{{exported_job}}"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+      },
+  
+      {
+        "type": "timeseries",
+        "title": "P95 duration (ms)",
+        "datasource": "prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum by(le,exported_job)(rate(agenda_job_duration_ms_bucket{exported_job!~\"agenda\\\\..*\", exported_job=~\"$job\"}[5m])))",
+            "legendFormat": "{{exported_job}}"
+          }
+        ],
+        "unit": "ms",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+      },
+  
+      {
+        "type": "gauge",
+        "title": "Currently running",
+        "datasource": "prometheus",
+        "targets": [
+          {
+            "expr": "agenda_job_in_flight{exported_job!~\"agenda\\\\..*\", exported_job=~\"$job\"}",
+            "instant": true,
+            "legendFormat": "{{exported_job}}"
+          }
+        ],
+        "fieldConfig": { "defaults": { "max": 20 } },
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 12 }
+      },
+      {
+        "type": "gauge",
+        "title": "Worker RSS (MB)",
+        "datasource": "prometheus",
+        "targets": [
+          {
+            "expr": "worker_rss_bytes / 1024 / 1024 / 1024",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "decgbytes", "min": 0, "max": 2048 }
+        },
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 12 }
+      },
+      {
+        "type": "gauge",
+        "title": "Worker CPU % (last s)",
+        "datasource": "prometheus",
+        "targets": [
+          {
+            "expr": "worker_cpu_percent",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "percent", "min": 0, "max": 400 }
+        },
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 12 }
+      }      
+    ]
+  }
+  

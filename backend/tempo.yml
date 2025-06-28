@@ -1,0 +1,17 @@
+# tempo.yaml  (stand-alone, OTLP http+grpc)
+
+server:
+  http_listen_port: 3200        # Grafana/Tempo API
+
+distributor:                    # <-- NEW parent
+  receivers:                    # <-- move under distributor
+    otlp:
+      protocols:
+        grpc:                   # gRPC 4317 (default)
+        http:                   # HTTP 4318
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo

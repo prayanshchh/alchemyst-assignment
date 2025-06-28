@@ -5,6 +5,7 @@ import gatherStep from './steps/gatherStep';
 import expandStep from './steps/expandStep';
 
 import { ConfirmChannel, ConsumeMessage } from 'amqplib';
+import { trace, context } from '@opentelemetry/api';
 
 const QUEUE = 'deep-research';
 
@@ -13,7 +14,7 @@ function enqueue(name: string, data: any) {
   return agenda
     .create(name, data)
     .unique({ name, 'data.jobId': data.jobId }, { insertOnly: true })
-    .schedule(new Date())          // <-- keep a nextRunAt
+    .schedule(new Date())
     .save();
 }
 
@@ -49,17 +50,25 @@ class RabbitMQWorker {
     await this.connect();
     if (!this.channel) throw new Error('Channel not initialized');
     await this.channel.prefetch(1);
+    const tracer = trace.getTracer('rabbit.consumer');
     this.channel.consume(QUEUE, async (msg: ConsumeMessage | null) => {
       if (!msg) return;
-      try {
-        const { jobId, topic } = JSON.parse(msg.content.toString());
-        await enqueue('plan', { jobId, topic });
-        this.channel?.ack(msg)
-        console.log(`Scheduled persistent Agenda job for jobId=${jobId}`);
-      } catch (err) {
-        console.error('Worker error:', err);
-        this.channel!.nack(msg, false, false);
-      }
+      await context.with(
+        trace.setSpan(context.active(),
+          tracer.startSpan('mq.consume', { attributes: { queue: QUEUE } })),
+        async () => {
+          try {
+            const { jobId, topic } = JSON.parse(msg.content.toString());
+            await enqueue('plan', { jobId, topic });
+            this.channel?.ack(msg)
+            console.log(`Scheduled persistent Agenda job for jobId=${jobId}`);
+          } catch (err) {
+            console.error('Worker error:', err);
+            this.channel!.nack(msg, false, false);
+          } finally {
+            trace.getSpan(context.active())?.end();
+          }
+        });
     });
   }
 }

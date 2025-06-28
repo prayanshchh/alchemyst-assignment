@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 dotenv.config();
 import { extractFinalResponseFromSSEString, parseSSEStream, ParseSSEStreamResult } from '../utils/parseSSEStream';
 import { parseProxyChatCompletionResponse } from '../utils/parseSSEStream';
+import { runInSpan } from '../utils/runInSpan';
 
 interface GatherJobData {
   jobId: string;
@@ -67,24 +68,26 @@ async function getCombinedGatherResultFromChatAPI(topic: string, promptsText: st
 export default function gatherStep(agenda: Agenda) {
   agenda.define('gather', async (job: Job<GatherJobData>, done) => {
     const { jobId, topic } = job.attrs.data;
-    try {
-      const planFinal = await getPlanFinalResponse(jobId);
-      if (!planFinal) throw new Error('No plan final_response found for jobId ' + jobId);
-      // Step 1: Get Google prompts
-      const promptsResult = await getGooglePromptsFromChatAPI(planFinal, topic);
-      if (!promptsResult) throw new Error('No Google prompts returned from Chat API');
-      // Step 2: Use prompts to get combined gather result
-      const gatherResult = await getCombinedGatherResultFromChatAPI(topic, promptsResult, planFinal);
-      console.log("I am result: ", gatherResult);
-      (job.attrs.data as any).results = { ...(job.attrs.data as any).results, gather: gatherResult };
-      await job.save();
-      console.log('Gather result saved in job document for jobId:', jobId);
-      done();
-    } catch (err) {
-      console.error('gatherStep error:', err);
-      (job.attrs.data as any).results = { ...(job.attrs.data as any).results, gather: { error: String(err) } };
-      await job.save();
-      done();
-    }
+    await runInSpan('agenda.gather', { jobId, topic }, async () => {
+      try {
+        const planFinal = await getPlanFinalResponse(jobId);
+        if (!planFinal) throw new Error('No plan final_response found for jobId ' + jobId);
+        // Step 1: Get Google prompts
+        const promptsResult = await getGooglePromptsFromChatAPI(planFinal, topic);
+        if (!promptsResult) throw new Error('No Google prompts returned from Chat API');
+        // Step 2: Use prompts to get combined gather result
+        const gatherResult = await getCombinedGatherResultFromChatAPI(topic, promptsResult, planFinal);
+        console.log("I am result: ", gatherResult);
+        (job.attrs.data as any).results = { ...(job.attrs.data as any).results, gather: gatherResult };
+        await job.save();
+        console.log('Gather result saved in job document for jobId:', jobId);
+        done();
+      } catch (err) {
+        console.error('gatherStep error:', err);
+        (job.attrs.data as any).results = { ...(job.attrs.data as any).results, gather: { error: String(err) } };
+        await job.save();
+        done();
+      }
+    });
   });
 } 
