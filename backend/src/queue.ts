@@ -10,7 +10,7 @@ class RabbitMQPublisher {
 
   async connect() {
     if (this.channel) return;
-    const conn = await amqplib.connect(URL);
+    const conn = await amqplib.connect(URL, { heartbeat: 60 });
     this.channel = await conn.createConfirmChannel();
 
     await this.channel.assertQueue(QUEUE, { durable: true });
