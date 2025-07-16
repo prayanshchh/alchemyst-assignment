@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import axios from 'axios';
+import api from './api';
 import { FaRobot } from 'react-icons/fa';
 import Header from './components/Header';
 import ConversationPane from './components/ConversationPane';
@@ -92,7 +92,7 @@ function App() {
     setStepLoading('expand');
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/status/${jobId}`);
+        const res = await api.get(`/status/${jobId}`);
         const { plan, gather, expand } = res.data;
         // If expand is available, show only expand and stop polling
         if (expand && expand.data && expand.data.results && expand.data.results.expand) {
@@ -126,7 +126,7 @@ function App() {
     addMessage(content, 'user');
     setIsTyping(true);
     try {
-      const res = await axios.post('http://localhost:5000/research', { topic: content });
+      const res = await api.post('/research', { topic: content });
       const { jobId } = res.data;
       pollJobStatus(jobId);
     } catch (err) {
